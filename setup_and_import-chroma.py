@@ -1,4 +1,4 @@
-import chromadb
+    import chromadb
 import json
 import os
 import logging
@@ -197,12 +197,11 @@ try:
                     "date": format_date(item.get("date", "")),
                     "url": item.get("video_location") or item.get("image") or f"https://addictiontube.com/articles/read/{item['title'].lower().replace(' ', '-')}_{content_id}.html",
                     "type": content_type,
-                    "tags": extract_tags(item.get("description", "")),
+                    "tags": ", ".join(extract_tags(item.get("description", ""))),  # <-- fixed here
                     "author": item.get("author", "Unknown"),
                     "schema_version": "v1.1",
                     "content_id": content_id
                 }
-
                 embeddings.append(vector)
                 documents.append(part)
                 metadatas.append(metadata)
@@ -257,5 +256,3 @@ try:
 except Exception as e:
     logger.error(f"❗ Error: {e}")
     raise
-finally:
-    client.close()
