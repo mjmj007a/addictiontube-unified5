@@ -3,51 +3,54 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import chromadb
+from chromadb.config import Settings
+from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import logging
 from dotenv import load_dotenv
 import os
 from openai import OpenAI
 import httpx
 
-# Set up logging
+# Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Flask app setup
 app = Flask(__name__)
 CORS(app, resources={r"/search_content": {"origins": "https://addictiontube.com"}})
 limiter = Limiter(app=app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 
+# Load environment
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Initialize Chroma client (in-memory)
+# Chroma client initialization
 def get_chroma_client():
+    embedding_function = OpenAIEmbeddingFunction(
+        api_key=OPENAI_API_KEY,
+        model_name="text-embedding-3-small"
+    )
+
     for attempt in range(3):
         try:
-            client = chromadb.Client()
+            client = chromadb.Client(Settings(chroma_api_impl="local"))
             logger.info(f"Chroma client initialized, attempt {attempt + 1}")
             try:
-                collection = client.get_collection("Content")
+                collection = client.get_collection("Content", embedding_function=embedding_function)
                 logger.info("Content collection found")
                 return client, collection
             except Exception as e:
                 logger.warning(f"'Content' collection not found: {str(e)}")
-                try:
-                    logger.info("Creating 'Content' collection in Chroma...")
-                    collection = client.create_collection(name="Content", embedding_function=None)
-                    logger.info("Content collection created successfully.")
-                    return client, collection
-                except Exception as inner_e:
-                    logger.error(f"Failed to create Content collection: {str(inner_e)}")
-                    client.close()
-                    raise
+                logger.info("Creating 'Content' collection in Chroma...")
+                collection = client.create_collection(name="Content", embedding_function=embedding_function)
+                logger.info("Content collection created successfully.")
+                return client, collection
         except Exception as e:
             logger.error(f"Chroma client initialization attempt {attempt + 1} failed: {str(e)}")
-    logger.error("Failed to initialize Chroma client after 3 attempts")
     raise EnvironmentError("Chroma client initialization failed")
 
 client, collection = get_chroma_client()
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 @app.route('/')
 def health_check():
@@ -63,7 +66,7 @@ def health_check():
 def search_content():
     try:
         query = request.args.get('q', '')
-        content_type = request.args.get('content_type', 'all')
+        content_type = request.args.get('type', 'all')
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 5))
 
@@ -107,7 +110,7 @@ def search_content():
 def rag_answer_content():
     try:
         query = request.args.get('q', '')
-        content_type = request.args.get('content_type', 'all')
+        content_type = request.args.get('type', 'all')
         reroll = request.args.get('reroll', 'no').lower() == 'yes'
 
         if not query:
