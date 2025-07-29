@@ -1,4 +1,4 @@
-    import chromadb
+import chromadb
 import json
 import os
 import logging
@@ -12,21 +12,15 @@ import tiktoken
 from bs4 import BeautifulSoup
 import httpx
 
-# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Load environment variables
 load_dotenv()
 
-# Initialize clients
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Initialize Chroma client (in-memory)
 client = chromadb.Client()
 logger.info("Connected to Chroma in-memory client")
 
-# Category mapping
 CATEGORY_MAP = {
     "1074": "Songs - Recovery",
     "1082": "Poems - Recovery",
@@ -112,14 +106,12 @@ skipped_items = []
 failed_objs_serializable = []
 
 try:
-    # Delete existing collection
     try:
         client.delete_collection("Content")
         logger.info("Existing 'Content' collection deleted.")
     except:
         logger.info("No existing 'Content' collection found.")
 
-    # Create new collection
     collection = client.create_collection(name="Content", embedding_function=None)
     logger.info("✅ 'Content' collection created")
 
@@ -197,11 +189,12 @@ try:
                     "date": format_date(item.get("date", "")),
                     "url": item.get("video_location") or item.get("image") or f"https://addictiontube.com/articles/read/{item['title'].lower().replace(' ', '-')}_{content_id}.html",
                     "type": content_type,
-                    "tags": ", ".join(extract_tags(item.get("description", ""))),  # <-- fixed here
+                    "tags": ", ".join(extract_tags(item.get("description", ""))),
                     "author": item.get("author", "Unknown"),
                     "schema_version": "v1.1",
                     "content_id": content_id
                 }
+
                 embeddings.append(vector)
                 documents.append(part)
                 metadatas.append(metadata)
@@ -231,7 +224,6 @@ try:
     logger.info(f"TOTAL uploaded: {total_uploaded}")
     logger.info(f"TOTAL skipped: {total_skipped}")
 
-    # Verify filtering
     try:
         for content_type in ["songs", "poems", "stories"]:
             results = collection.query(
@@ -247,7 +239,6 @@ try:
     except Exception as e:
         logger.error(f"Failed to verify filtering for 'type': {e}")
 
-    # Skip writing skipped_items.json and failed_inserts.json due to read-only filesystem
     if skipped_items:
         logger.info(f"📝 Skipped {len(skipped_items)} items (not saved due to in-memory mode)")
     if failed_objs_serializable:
@@ -256,3 +247,4 @@ try:
 except Exception as e:
     logger.error(f"❗ Error: {e}")
     raise
+
