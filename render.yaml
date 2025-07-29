@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: addictiontube-unified5
+    runtime: python
+    runtimeVersion: 3.10
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: python setup_and_import-chroma.py && gunicorn -w 1 --timeout 300 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
